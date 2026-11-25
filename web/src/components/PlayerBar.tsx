@@ -9,7 +9,9 @@ export function PlayerBar() {
   const ps = usePlayer()
   if (!ps.station) return null
 
-  const status = ps.error ? 'Stream unavailable. Try another station.' : ps.isLoading ? 'Connecting…' : ps.isPlaying ? 'Live' : 'Paused'
+  const status = ps.error === 'insecure'
+    ? 'This station only streams over insecure HTTP, which browsers block here.'
+    : ps.error ? 'Stream unavailable. Try another station.' : ps.isLoading ? 'Connecting…' : ps.isPlaying ? 'Live' : 'Paused'
 
   return (
     <section aria-label="Now playing" className="sticky bottom-0 z-40 border-t border-line bg-panel-glass backdrop-blur">
@@ -17,7 +19,17 @@ export function PlayerBar() {
         <Artwork src={ps.station.favicon} size={44} />
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-semibold text-ink">{ps.station.name}</div>
-          <div className={`truncate text-xs ${ps.error ? 'text-danger' : 'text-muted'}`} role="status">{status}</div>
+          <div className={`text-xs ${ps.error ? 'text-danger' : 'truncate text-muted'}`} role="status">
+            {status}
+            {ps.error === 'insecure' && ps.station.homepage && (
+              <>
+                {' '}
+                <a href={ps.station.homepage} target="_blank" rel="noopener noreferrer" className="text-accent underline">
+                  Listen on the station's site
+                </a>
+              </>
+            )}
+          </div>
         </div>
         <button
           type="button"

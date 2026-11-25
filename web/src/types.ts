@@ -2,6 +2,8 @@ export interface RadioStation {
   id: string
   name: string
   streamUrl: string
+  /** The station's listed URL when it differs from the resolved streamUrl. */
+  altStreamUrl?: string
   genre?: string
   country?: string
   language?: string

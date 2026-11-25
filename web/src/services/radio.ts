@@ -51,6 +51,7 @@ function mapStation(station: RawRadioStation): RadioStation {
     id: `radio-${station.stationuuid}`,
     name: station.name,
     streamUrl: station.url_resolved || station.url,
+    altStreamUrl: station.url_resolved && station.url !== station.url_resolved ? station.url : undefined,
     genre: station.tags,
     country: station.country,
     language: station.language,

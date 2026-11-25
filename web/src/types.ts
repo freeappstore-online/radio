@@ -1,5 +1,4 @@
 export interface RadioStation {
-  adFree?: boolean
   id: string
   name: string
   streamUrl: string
@@ -16,4 +15,8 @@ export interface RadioStation {
   clickcount?: number
   state?: string
   tags?: string
+  /** The stream is HLS (an .m3u8 playlist). */
+  hls?: boolean
+  /** The network a hand-picked station belongs to, e.g. Radio France. */
+  source?: string
 }

@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PageHeader, Spinner } from '@freeappstore/sdk/ui'
-import { searchStations, type RadioFilters, type RadioOrder } from '../services/radio'
+import { PAGE_SIZE, searchStations, type RadioFilters, type RadioOrder } from '../services/radio'
+import { filterPlayable, isReachable, knownUnplayable } from '../services/availability'
 import { getSomaFMChannels } from '../services/somafm'
+import { CURATED, matchCurated } from '../services/curated'
 import type { RadioStation } from '../types'
 import { StationRow } from './StationRow'
-import { getFavorites } from '../services/library'
+import { isBlocked, useLibraryVersion } from '../services/library'
 
 const GENRES = [
   ['pop', '🎤'], ['rock', '🎸'], ['news', '📰'], ['classical', '🎼'], ['dance', '💃'], ['talk', '🎙️'],
@@ -43,57 +45,121 @@ const QUALITIES = [
   { value: '320', label: '320 kbps (HD)' },
 ]
 
-const SOMA_PREVIEW = 6
+const PICKS_PREVIEW = 8
+
+const LINK = 'inline-flex min-h-11 items-center px-1 text-accent underline focus-visible:outline-2 focus-visible:outline-accent'
+
+/** Filters live in the URL query so they survive visiting another screen and coming back. */
+function initialParam(key: string): string {
+  return new URLSearchParams(window.location.search).get(key) ?? ''
+}
 
 export function BrowseScreen() {
-  const [name, setName] = useState('')
-  const [favoritesOnly, setFavoritesOnly] = useState(false)
-  const [adFreeOnly, setAdFreeOnly] = useState(false)
-  const [, setLibraryVersion] = useState(0)
-  const refreshLibrary = () => setLibraryVersion(v => v + 1)
-  const [genre, setGenre] = useState('')
-  const [country, setCountry] = useState('')
-  const [language, setLanguage] = useState('')
-  const [quality, setQuality] = useState('')
-  const [order, setOrder] = useState<RadioOrder>('clickcount')
+  const [name, setName] = useState(() => initialParam('q'))
+  const [genre, setGenre] = useState(() => initialParam('genre'))
+  const [country, setCountry] = useState(() => initialParam('country'))
+  const [language, setLanguage] = useState(() => initialParam('lang'))
+  const [quality, setQuality] = useState(() => initialParam('quality'))
+  const [order, setOrder] = useState<RadioOrder>(() => (ORDERS.find(o => o.value === initialParam('sort'))?.value ?? 'clickcount'))
+  useLibraryVersion()
+  const resultsHeading = useRef<HTMLHeadingElement>(null)
+
+  useEffect(() => {
+    const params = new URLSearchParams()
+    if (name) params.set('q', name)
+    if (genre) params.set('genre', genre)
+    if (country) params.set('country', country)
+    if (language) params.set('lang', language)
+    if (quality) params.set('quality', quality)
+    if (order !== 'clickcount') params.set('sort', order)
+    const query = params.toString()
+    if (window.location.pathname === '/' && window.location.search !== (query ? `?${query}` : '')) {
+      window.history.replaceState(window.history.state, '', query ? `/?${query}` : '/')
+    }
+  }, [name, genre, country, language, quality, order])
   const [stations, setStations] = useState<RadioStation[]>([])
+  const [nextOffset, setNextOffset] = useState(0)
+  const [hasMore, setHasMore] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [retry, setRetry] = useState(0)
+  const [curated, setCurated] = useState<RadioStation[]>([])
   const [soma, setSoma] = useState<RadioStation[]>([])
-  const [somaLoading, setSomaLoading] = useState(true)
-  const [showAllSoma, setShowAllSoma] = useState(false)
+  const [showAllPicks, setShowAllPicks] = useState(false)
 
-  const filtered = !!(name.trim() || genre || country || language || quality || favoritesOnly || adFreeOnly)
-  const somaIds = new Set(soma.map(s => s.id))
-  const favoriteIds = new Set(getFavorites().map(s => s.id))
-  const matches = (s: RadioStation) => (!name.trim() || s.name.toLowerCase().includes(name.trim().toLowerCase())) && (!genre || (s.tags ?? s.genre ?? "").toLowerCase().includes(genre.toLowerCase())) && (!country || s.country?.toLowerCase() === country.toLowerCase()) && (!language || (s.language ?? "").toLowerCase().includes(language.toLowerCase())) && (!quality || (s.bitrate ?? 0) >= Number(quality))
-  const source = favoritesOnly ? getFavorites().map(s => soma.find(x => x.id === s.id) ?? s) : adFreeOnly ? soma : stations
-  const results = source.filter(s => (!favoritesOnly || favoriteIds.has(s.id)) && (!adFreeOnly || (somaIds.has(s.id) && s.adFree === true)) && (!favoritesOnly && !adFreeOnly || matches(s)))
+  const filtered = !!(name.trim() || genre || country || language || quality)
 
-  useEffect(() => { getSomaFMChannels().then(setSoma).finally(() => setSomaLoading(false)) }, [])
+  // Hand-picked stations: the curated list plus SomaFM's channels, minus any this browser can't play.
+  useEffect(() => {
+    filterPlayable(CURATED).then(setCurated)
+    getSomaFMChannels().then(filterPlayable).then(setSoma)
+  }, [])
+  const picks = useMemo(() => [...curated, ...soma], [curated, soma])
+
+  // The curated list has no country, language or bitrate index, so it only joins name and genre searches.
+  const pickMatches = !country && !language && !quality ? matchCurated(picks, name, genre) : []
+
+  const filters = useMemo<RadioFilters>(() => ({
+    name: name.trim() || undefined,
+    tag: genre || undefined,
+    country: country || undefined,
+    language: language || undefined,
+    bitrateMin: quality ? Number(quality) : undefined,
+  }), [name, genre, country, language, quality])
+
+  // Bumped on every new search; a page that arrives for an older search is dropped.
+  const generation = useRef(0)
+
+  /**
+   * Fetch one page and append the stations this browser can play. http-only stations are
+   * shown straight away and dropped if their https check fails, so the list isn't held up.
+   */
+  const loadPage = useCallback(async (offset: number, gen: number) => {
+    const page = await searchStations(filters, order, offset)
+    if (gen !== generation.current) return
+    const candidates = page.filter(s => !knownUnplayable(s))
+    setStations(prev => {
+      const seen = new Set(prev.map(s => s.id))
+      return [...prev, ...candidates.filter(s => !seen.has(s.id))]
+    })
+    setNextOffset(offset + page.length)
+    setHasMore(page.length === PAGE_SIZE)
+    for (const s of candidates) {
+      isReachable(s).then(ok => {
+        if (!ok && gen === generation.current) setStations(prev => prev.filter(x => x.id !== s.id))
+      })
+    }
+  }, [filters, order])
 
   useEffect(() => {
-    let cancelled = false
-    const filters: RadioFilters = {
-      name: name.trim() || undefined,
-      tag: genre || undefined,
-      country: country || undefined,
-      language: language || undefined,
-      bitrateMin: quality ? Number(quality) : undefined,
-    }
+    const gen = ++generation.current
     const timer = setTimeout(() => {
       setLoading(true)
       setError(false)
-      searchStations(filters, order)
-        .then(s => { if (!cancelled) setStations(s) })
-        .catch(() => { if (!cancelled) { setStations([]); setError(true) } })
-        .finally(() => { if (!cancelled) setLoading(false) })
+      setStations([])
+      setHasMore(false)
+      loadPage(0, gen)
+        .catch(() => { if (gen === generation.current) setError(true) })
+        .finally(() => { if (gen === generation.current) setLoading(false) })
     }, 300)
-    return () => { cancelled = true; clearTimeout(timer) }
-  }, [name, genre, country, language, quality, order, retry])
+    return () => clearTimeout(timer)
+  }, [loadPage, retry])
 
-  const clearAll = () => { setName(''); setGenre(''); setCountry(''); setLanguage(''); setQuality(''); setOrder('clickcount'); setFavoritesOnly(false); setAdFreeOnly(false) }
+  const visible = stations.filter(s => !isBlocked(s.id))
+
+  const loadMore = () => {
+    const gen = generation.current
+    setLoadingMore(true)
+    loadPage(nextOffset, gen)
+      .catch(() => { if (gen === generation.current) setError(true) })
+      .finally(() => { if (gen === generation.current) setLoadingMore(false) })
+  }
+
+  const clearAll = () => {
+    setName(''); setGenre(''); setCountry(''); setLanguage(''); setQuality(''); setOrder('clickcount')
+    document.getElementById('station-search')?.focus() // the button that was clicked disappears
+  }
 
   return (
     <>
@@ -107,15 +173,11 @@ export function BrowseScreen() {
           value={name}
           onChange={e => setName(e.target.value)}
           placeholder="e.g. BBC, jazz, lofi"
-          className="w-full rounded-full border border-line bg-panel px-4 py-2 text-sm text-ink focus-visible:outline-2 focus-visible:outline-accent"
+          className="min-h-11 w-full rounded-full border border-line bg-panel px-4 text-sm text-ink focus-visible:outline-2 focus-visible:outline-accent"
         />
       </div>
 
       <div className="mt-4 space-y-3">
-        <div role="group" aria-label="Station filters" className="flex flex-wrap gap-2">
-          <button type="button" aria-pressed={favoritesOnly} onClick={() => setFavoritesOnly(v => !v)} className={`min-h-11 rounded-lg px-3 text-sm ${favoritesOnly ? "bg-accent text-paper" : "bg-paper-deep text-ink"}`}>Favorites</button>
-          <button type="button" aria-pressed={adFreeOnly} onClick={() => setAdFreeOnly(v => !v)} className={`min-h-11 rounded-lg px-3 text-sm ${adFreeOnly ? "bg-accent text-paper" : "bg-paper-deep text-ink"}`}>Ad-free</button>
-        </div>
         <ChipGroup label="Sort by" options={ORDERS} value={order} onChange={v => setOrder((v || 'clickcount') as RadioOrder)} required />
         <ChipGroup label="Quality" options={QUALITIES} value={quality} onChange={setQuality} />
         <ChipGroup label="Genre" options={GENRES} value={genre} onChange={setGenre} />
@@ -128,38 +190,53 @@ export function BrowseScreen() {
         )}
       </div>
 
-      {!filtered && soma.length > 0 && (
-        <section className="mt-6" aria-labelledby="soma-heading">
-          <h2 id="soma-heading" className="text-lg font-bold text-ink">Ad-free · SomaFM</h2>
+      {pickMatches.length > 0 && (
+        <section className="mt-6" aria-labelledby="picks-heading">
+          <h2 id="picks-heading" tabIndex={-1} className="text-lg font-bold text-ink">{filtered ? 'Hand-picked matches' : 'Hand-picked'}</h2>
+          {!filtered && <p className="mt-1 text-xs text-muted">Public, listener-supported and independent radio with reliable streams.</p>}
           <ul className="mt-1">
-            {(showAllSoma ? soma : soma.slice(0, SOMA_PREVIEW)).map(s => <StationRow key={s.id} station={s} onChange={refreshLibrary} />)}
+            {(showAllPicks ? pickMatches : pickMatches.slice(0, PICKS_PREVIEW)).map(s => <StationRow key={s.id} station={s} />)}
           </ul>
-          {soma.length > SOMA_PREVIEW && (
-            <button type="button" onClick={() => setShowAllSoma(!showAllSoma)} className="min-h-11 text-sm text-accent underline focus-visible:outline-2 focus-visible:outline-accent">
-              {showAllSoma ? 'Show fewer' : `Show all ${soma.length} SomaFM channels`}
+          {pickMatches.length > PICKS_PREVIEW && (
+            <button type="button" aria-expanded={showAllPicks} onClick={() => setShowAllPicks(!showAllPicks)} className="min-h-11 text-sm text-accent underline focus-visible:outline-2 focus-visible:outline-accent">
+              {showAllPicks ? 'Show fewer' : `Show all ${pickMatches.length} hand-picked stations`}
             </button>
           )}
         </section>
       )}
 
-      <section className="mt-6" aria-labelledby="results-heading" aria-busy={adFreeOnly ? somaLoading : !favoritesOnly && loading}>
-        <h2 id="results-heading" className="text-lg font-bold text-ink">{filtered ? 'Results' : 'Popular stations'}</h2>
-        {(adFreeOnly && somaLoading) || (loading && !favoritesOnly && !adFreeOnly) ? (
+      <section className="mt-6" aria-labelledby="results-heading" aria-busy={loading}>
+        <h2 id="results-heading" ref={resultsHeading} tabIndex={-1} className="text-lg font-bold text-ink">
+          {filtered ? 'Results' : `${ORDERS.find(o => o.value === order)?.label ?? 'Popular'} stations`}
+        </h2>
+        {loading ? (
           <div className="flex justify-center py-12" role="status" aria-label="Loading stations"><Spinner /></div>
-        ) : error && !favoritesOnly && !adFreeOnly ? (
+        ) : error ? (
           <div className="py-12 text-center text-sm text-muted" role="alert">
             Couldn't reach the radio directory.{' '}
-            <button type="button" onClick={() => setRetry(r => r + 1)} className="text-accent underline">Try again</button>
+            <button type="button" onClick={() => { setRetry(r => r + 1); resultsHeading.current?.focus() }} className={LINK}>Try again</button>
           </div>
-        ) : results.length === 0 ? (
+        ) : visible.length === 0 && !hasMore ? (
           <div className="py-12 text-center text-sm text-muted">
             No stations match your filters.{' '}
-            <button type="button" onClick={clearAll} className="text-accent underline">Clear all filters</button>
+            <button type="button" onClick={clearAll} className={LINK}>Clear all filters</button>
           </div>
         ) : (
           <>
-            <p className="mt-1 text-xs text-muted">{results.length} stations</p>
-            <ul className="mt-1">{results.map(s => <StationRow key={s.id} station={s} onChange={refreshLibrary} />)}</ul>
+            <p className="mt-1 text-xs text-muted" aria-live="polite">{visible.length} stations{hasMore ? ' so far' : ''}</p>
+            <ul className="mt-1">{visible.map(s => <StationRow key={s.id} station={s} />)}</ul>
+            {hasMore && (
+              <div className="mt-3 flex justify-center">
+                <button
+                  type="button"
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                  className="min-h-11 rounded-full border border-line bg-panel px-5 text-sm font-semibold text-ink hover:bg-paper-deep focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-60"
+                >
+                  {loadingMore ? 'Loading…' : 'Load more stations'}
+                </button>
+              </div>
+            )}
           </>
         )}
       </section>
@@ -177,7 +254,7 @@ function ChipGroup({ label, options, value, onChange, required }: {
   return (
     <div role="group" aria-label={label}>
       <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted">{label}</div>
-      <div className="flex flex-wrap gap-2 pb-1">
+      <div className="-m-1 flex gap-1 overflow-x-auto p-1 sm:flex-wrap sm:overflow-visible">
         {options.map(o => {
           const active = value === o.value
           return (
@@ -186,7 +263,7 @@ function ChipGroup({ label, options, value, onChange, required }: {
               type="button"
               aria-pressed={active}
               onClick={() => onChange(active && !required ? '' : o.value)}
-              className={`min-h-11 rounded-lg px-2.5 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent ${
+              className={`min-h-11 flex-shrink-0 rounded-lg px-2.5 text-xs whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent ${
                 active ? 'bg-accent font-semibold text-paper' : 'bg-paper-deep text-muted hover:text-ink'
               }`}
             >

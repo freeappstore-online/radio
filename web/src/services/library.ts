@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from 'react'
 import type { RadioStation } from '../types'
 
 // Device-local library: favorites, blocked stations and play history.
@@ -6,12 +7,25 @@ const BLOCKED_KEY = 'radio-blocked'
 const HISTORY_KEY = 'radio-history'
 const HISTORY_MAX = 50
 
+// Every write bumps the version so all rows and screens showing library state re-render.
+let version = 0
+const listeners = new Set<() => void>()
+
+export function useLibraryVersion(): number {
+  return useSyncExternalStore(
+    fn => { listeners.add(fn); return () => listeners.delete(fn) },
+    () => version,
+  )
+}
+
 function read<T>(key: string, fallback: T): T {
   try { return JSON.parse(localStorage.getItem(key) || 'null') ?? fallback } catch { return fallback }
 }
 
 function write(key: string, value: unknown) {
   localStorage.setItem(key, JSON.stringify(value))
+  version += 1
+  listeners.forEach(fn => fn())
 }
 
 // ===== Favorites =====
@@ -71,4 +85,6 @@ export function addToHistory(station: RadioStation) {
 
 export function clearHistory() {
   localStorage.removeItem(HISTORY_KEY)
+  version += 1
+  listeners.forEach(fn => fn())
 }

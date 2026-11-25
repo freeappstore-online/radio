@@ -27,6 +27,8 @@ export async function getSomaFMChannels(): Promise<RadioStation[]> {
       const directStream = `https://ice2.somafm.com/${id}-128-mp3`
 
       return {
+        // SomaFM describes its channels as commercial-free: https://somafm.com/support/
+        adFree: true,
         id: `soma-${id}`,
         name: channel.title,
         streamUrl: directStream,

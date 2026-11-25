@@ -4,6 +4,7 @@ import { searchStations, type RadioFilters, type RadioOrder } from '../services/
 import { getSomaFMChannels } from '../services/somafm'
 import type { RadioStation } from '../types'
 import { StationRow } from './StationRow'
+import { getFavorites } from '../services/library'
 
 const GENRES = [
   ['pop', '🎤'], ['rock', '🎸'], ['news', '📰'], ['classical', '🎼'], ['dance', '💃'], ['talk', '🎙️'],
@@ -46,6 +47,10 @@ const SOMA_PREVIEW = 6
 
 export function BrowseScreen() {
   const [name, setName] = useState('')
+  const [favoritesOnly, setFavoritesOnly] = useState(false)
+  const [adFreeOnly, setAdFreeOnly] = useState(false)
+  const [, setLibraryVersion] = useState(0)
+  const refreshLibrary = () => setLibraryVersion(v => v + 1)
   const [genre, setGenre] = useState('')
   const [country, setCountry] = useState('')
   const [language, setLanguage] = useState('')
@@ -56,11 +61,17 @@ export function BrowseScreen() {
   const [error, setError] = useState(false)
   const [retry, setRetry] = useState(0)
   const [soma, setSoma] = useState<RadioStation[]>([])
+  const [somaLoading, setSomaLoading] = useState(true)
   const [showAllSoma, setShowAllSoma] = useState(false)
 
-  const filtered = !!(name.trim() || genre || country || language || quality)
+  const filtered = !!(name.trim() || genre || country || language || quality || favoritesOnly || adFreeOnly)
+  const somaIds = new Set(soma.map(s => s.id))
+  const favoriteIds = new Set(getFavorites().map(s => s.id))
+  const matches = (s: RadioStation) => (!name.trim() || s.name.toLowerCase().includes(name.trim().toLowerCase())) && (!genre || (s.tags ?? s.genre ?? "").toLowerCase().includes(genre.toLowerCase())) && (!country || s.country?.toLowerCase() === country.toLowerCase()) && (!language || (s.language ?? "").toLowerCase().includes(language.toLowerCase())) && (!quality || (s.bitrate ?? 0) >= Number(quality))
+  const source = favoritesOnly ? getFavorites().map(s => soma.find(x => x.id === s.id) ?? s) : adFreeOnly ? soma : stations
+  const results = source.filter(s => (!favoritesOnly || favoriteIds.has(s.id)) && (!adFreeOnly || (somaIds.has(s.id) && s.adFree === true)) && (!favoritesOnly && !adFreeOnly || matches(s)))
 
-  useEffect(() => { getSomaFMChannels().then(setSoma) }, [])
+  useEffect(() => { getSomaFMChannels().then(setSoma).finally(() => setSomaLoading(false)) }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -82,7 +93,7 @@ export function BrowseScreen() {
     return () => { cancelled = true; clearTimeout(timer) }
   }, [name, genre, country, language, quality, order, retry])
 
-  const clearAll = () => { setName(''); setGenre(''); setCountry(''); setLanguage(''); setQuality(''); setOrder('clickcount') }
+  const clearAll = () => { setName(''); setGenre(''); setCountry(''); setLanguage(''); setQuality(''); setOrder('clickcount'); setFavoritesOnly(false); setAdFreeOnly(false) }
 
   return (
     <>
@@ -101,6 +112,10 @@ export function BrowseScreen() {
       </div>
 
       <div className="mt-4 space-y-3">
+        <div role="group" aria-label="Station filters" className="flex flex-wrap gap-2">
+          <button type="button" aria-pressed={favoritesOnly} onClick={() => setFavoritesOnly(v => !v)} className={`min-h-11 rounded-lg px-3 text-sm ${favoritesOnly ? "bg-accent text-paper" : "bg-paper-deep text-ink"}`}>Favorites</button>
+          <button type="button" aria-pressed={adFreeOnly} onClick={() => setAdFreeOnly(v => !v)} className={`min-h-11 rounded-lg px-3 text-sm ${adFreeOnly ? "bg-accent text-paper" : "bg-paper-deep text-ink"}`}>Ad-free</button>
+        </div>
         <ChipGroup label="Sort by" options={ORDERS} value={order} onChange={v => setOrder((v || 'clickcount') as RadioOrder)} required />
         <ChipGroup label="Quality" options={QUALITIES} value={quality} onChange={setQuality} />
         <ChipGroup label="Genre" options={GENRES} value={genre} onChange={setGenre} />
@@ -117,7 +132,7 @@ export function BrowseScreen() {
         <section className="mt-6" aria-labelledby="soma-heading">
           <h2 id="soma-heading" className="text-lg font-bold text-ink">Ad-free · SomaFM</h2>
           <ul className="mt-1">
-            {(showAllSoma ? soma : soma.slice(0, SOMA_PREVIEW)).map(s => <StationRow key={s.id} station={s} />)}
+            {(showAllSoma ? soma : soma.slice(0, SOMA_PREVIEW)).map(s => <StationRow key={s.id} station={s} onChange={refreshLibrary} />)}
           </ul>
           {soma.length > SOMA_PREVIEW && (
             <button type="button" onClick={() => setShowAllSoma(!showAllSoma)} className="min-h-11 text-sm text-accent underline focus-visible:outline-2 focus-visible:outline-accent">
@@ -127,24 +142,24 @@ export function BrowseScreen() {
         </section>
       )}
 
-      <section className="mt-6" aria-labelledby="results-heading" aria-busy={loading}>
+      <section className="mt-6" aria-labelledby="results-heading" aria-busy={adFreeOnly ? somaLoading : !favoritesOnly && loading}>
         <h2 id="results-heading" className="text-lg font-bold text-ink">{filtered ? 'Results' : 'Popular stations'}</h2>
-        {loading ? (
+        {(adFreeOnly && somaLoading) || (loading && !favoritesOnly && !adFreeOnly) ? (
           <div className="flex justify-center py-12" role="status" aria-label="Loading stations"><Spinner /></div>
-        ) : error ? (
+        ) : error && !favoritesOnly && !adFreeOnly ? (
           <div className="py-12 text-center text-sm text-muted" role="alert">
             Couldn't reach the radio directory.{' '}
             <button type="button" onClick={() => setRetry(r => r + 1)} className="text-accent underline">Try again</button>
           </div>
-        ) : stations.length === 0 ? (
+        ) : results.length === 0 ? (
           <div className="py-12 text-center text-sm text-muted">
             No stations match your filters.{' '}
             <button type="button" onClick={clearAll} className="text-accent underline">Clear all filters</button>
           </div>
         ) : (
           <>
-            <p className="mt-1 text-xs text-muted">{stations.length} stations</p>
-            <ul className="mt-1">{stations.map(s => <StationRow key={s.id} station={s} />)}</ul>
+            <p className="mt-1 text-xs text-muted">{results.length} stations</p>
+            <ul className="mt-1">{results.map(s => <StationRow key={s.id} station={s} onChange={refreshLibrary} />)}</ul>
           </>
         )}
       </section>
@@ -162,7 +177,7 @@ function ChipGroup({ label, options, value, onChange, required }: {
   return (
     <div role="group" aria-label={label}>
       <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted">{label}</div>
-      <div className="flex gap-1 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible">
+      <div className="flex flex-wrap gap-2 pb-1">
         {options.map(o => {
           const active = value === o.value
           return (
@@ -171,7 +186,7 @@ function ChipGroup({ label, options, value, onChange, required }: {
               type="button"
               aria-pressed={active}
               onClick={() => onChange(active && !required ? '' : o.value)}
-              className={`min-h-9 flex-shrink-0 rounded-lg px-2.5 text-xs whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent ${
+              className={`min-h-11 rounded-lg px-2.5 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent ${
                 active ? 'bg-accent font-semibold text-paper' : 'bg-paper-deep text-muted hover:text-ink'
               }`}
             >

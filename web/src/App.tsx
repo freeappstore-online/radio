@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { initApp } from "@freeappstore/sdk";
-import { type NavItem, PageHeader, Shell } from "@freeappstore/sdk/ui";
+import { type NavItem, PageHeader, ProfilePage, Shell } from "@freeappstore/sdk/ui";
 import { BrowseScreen } from "./components/BrowseScreen";
 import { LibraryScreen } from "./components/LibraryScreen";
 import { PlayerBar } from "./components/PlayerBar";
-import { player } from "./services/player";
+import { Home, Library, Info } from "lucide-react";
 
 export const fas = initApp({ appId: "radio" });
 
@@ -29,22 +29,23 @@ export default function App() {
   };
 
   return (
-    <Shell app={fas} appName="Radio" nav={NAV} onNavigate={navigate}>
+    <Shell app={fas} appName="Radio" nav={NAV} onNavigate={navigate} profileHref="/profile" headerAppearance={false} renderNav={({ items, currentPath, onNavigate }) => (
+      <nav aria-label="Main" className="flex max-w-full items-center gap-1">
+        {items.map((item, i) => { const Icon = [Home, Library, Info][i]; return <a key={item.href} href={item.href} aria-current={currentPath === item.href ? "page" : undefined} onClick={e => { if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.button === 0) { e.preventDefault(); onNavigate(item.href); } }} className="flex min-h-11 min-w-11 flex-col items-center justify-center rounded px-1 text-xs text-ink focus-visible:outline-2 focus-visible:outline-accent"><Icon aria-hidden size={19} /><span>{item.label}</span></a> })}
+      </nav>
+    )}>
       <Screens path={path} />
+      <PlayerBar />
     </Shell>
   );
 }
 
 function Screens({ path }: { path: string }) {
-  // Shell swaps these out for its Profile screen; pause so audio never plays without controls.
-  useEffect(() => () => player.pause(), []);
-
   return (
     <>
-      <div className="mx-auto w-full max-w-3xl flex-1 p-4 sm:p-8">
-        {path === "/about" ? <About /> : path === "/library" ? <LibraryScreen /> : <BrowseScreen />}
+      <div className="mx-auto w-full max-w-3xl min-w-0 flex-1 p-4 sm:p-8">
+        {path === "/profile" ? <ProfilePage app={fas} /> : path === "/about" ? <About /> : path === "/library" ? <LibraryScreen /> : <BrowseScreen />}
       </div>
-      <PlayerBar />
     </>
   );
 }

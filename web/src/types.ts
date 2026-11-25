@@ -1,4 +1,5 @@
 export interface RadioStation {
+  adFree?: boolean
   id: string
   name: string
   streamUrl: string

@@ -15,10 +15,6 @@ export function formatCount(n: number): string {
   return String(n)
 }
 
-function isAdFree(station: RadioStation, userTags: string[]): boolean {
-  return station.id.startsWith('soma-') || userTags.some(t => /ad.?free|no.?ads/i.test(t))
-}
-
 export function StationRow({ station, onChange }: { station: RadioStation; onChange?: () => void }) {
   const ps = usePlayer()
   const [fav, setFav] = useState(() => isFavorite(station.id))
@@ -63,10 +59,10 @@ export function StationRow({ station, onChange }: { station: RadioStation; onCha
             </span>
           </span>
           <span className="min-w-0 flex-1">
-            <span className={`flex items-center gap-1.5 truncate text-sm font-semibold ${current ? 'text-accent' : 'text-ink'}`}>
+            <span className={`flex items-center gap-1.5 truncate text-base font-semibold ${current ? 'text-accent' : 'text-ink'}`}>
               <span className="truncate">{station.name}</span>
-              {isAdFree(station, userTags) && (
-                <span className="flex-shrink-0 rounded bg-accent-soft px-1.5 py-0.5 text-[10px] font-bold text-accent-deep">AD-FREE</span>
+              {station.adFree === true && (
+                <span className="flex-shrink-0 rounded bg-accent-soft px-1.5 py-0.5 text-xs font-bold text-accent-deep">AD-FREE</span>
               )}
             </span>
             {meta && <span className="mt-0.5 block truncate text-xs text-muted">{meta}</span>}
@@ -96,8 +92,8 @@ export function StationRow({ station, onChange }: { station: RadioStation; onCha
       </div>
 
       {expanded && (
-        <div className="mb-3 ml-14 space-y-3 rounded-xl border border-line bg-panel p-3 text-xs">
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-1">
+        <div className="mb-3 space-y-3 rounded-xl border border-line bg-panel p-3 text-xs">
+          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
             {station.country && <Detail label="Country" value={station.country} />}
             {station.state && <Detail label="State" value={station.state} />}
             {station.language && <Detail label="Language" value={station.language} />}
@@ -134,7 +130,7 @@ export function StationRow({ station, onChange }: { station: RadioStation; onCha
                 value={newTag}
                 onChange={e => setNewTag(e.target.value)}
                 placeholder="Add tag, e.g. ad-free"
-                className="w-36 rounded-full border border-line bg-paper px-2 py-1 text-ink"
+                className="w-36 max-w-full rounded-full border border-line bg-paper px-2 py-1 text-ink"
               />
             </form>
           </div>

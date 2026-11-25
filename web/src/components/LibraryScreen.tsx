@@ -6,7 +6,9 @@ import { StationRow } from './StationRow'
 export function LibraryScreen() {
   const [, setVersion] = useState(0)
   const refresh = () => setVersion(v => v + 1)
+  const [query, setQuery] = useState('')
   const favorites = getFavorites()
+  const matches = favorites.filter(s => s.name.toLowerCase().includes(query.trim().toLowerCase()))
   const history = getHistory()
   const blocked = getBlocked()
 
@@ -16,10 +18,12 @@ export function LibraryScreen() {
 
       <section className="mt-6" aria-labelledby="fav-heading">
         <h2 id="fav-heading" className="text-lg font-bold text-ink">Favorites ({favorites.length})</h2>
+        <label className="mt-3 block text-sm font-semibold" htmlFor="favorite-search">Search favorites</label>
+        <input id="favorite-search" type="search" value={query} onChange={e => setQuery(e.target.value)} className="mt-1 w-full max-w-full rounded-lg border border-line bg-panel px-3 py-2 text-base text-ink" />
         {favorites.length === 0 ? (
           <EmptyState message="Tap the heart on any station to save it here." />
         ) : (
-          <ul className="mt-1">{favorites.map(s => <StationRow key={s.id} station={s} onChange={refresh} />)}</ul>
+          matches.length === 0 ? <EmptyState message="No favorites match your search." /> : <ul className="mt-1">{matches.map(s => <StationRow key={s.id} station={s} onChange={refresh} />)}</ul>
         )}
       </section>
 

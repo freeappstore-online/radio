@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { EmptyState, PageHeader, useToast } from '@freeappstore/sdk/ui'
 import { clearHistory, getBlocked, getFavorites, getHistory, unblock, useLibraryVersion } from '../services/library'
 import { StationRow } from './StationRow'
@@ -8,7 +8,9 @@ export function LibraryScreen() {
   const toast = useToast()
   const historyHeading = useRef<HTMLHeadingElement>(null)
   const blockedHeading = useRef<HTMLHeadingElement>(null)
+  const [query, setQuery] = useState('')
   const favorites = getFavorites()
+  const matches = favorites.filter(s => s.name.toLowerCase().includes(query.trim().toLowerCase()))
   const history = getHistory()
   const blocked = getBlocked()
 
@@ -18,10 +20,12 @@ export function LibraryScreen() {
 
       <section className="mt-6" aria-labelledby="fav-heading">
         <h2 id="fav-heading" tabIndex={-1} className="text-lg font-bold text-ink">Favorites ({favorites.length})</h2>
+        <label className="mt-3 block text-sm font-semibold" htmlFor="favorite-search">Search favorites</label>
+        <input id="favorite-search" type="search" value={query} onChange={e => setQuery(e.target.value)} className="mt-1 min-h-11 w-full max-w-full rounded-lg border border-line bg-panel px-3 text-base text-ink focus-visible:outline-2 focus-visible:outline-accent" />
         {favorites.length === 0 ? (
           <EmptyState message="Tap the heart on any station to save it here." />
         ) : (
-          <ul className="mt-1">{favorites.map(s => <StationRow key={s.id} station={s} />)}</ul>
+          matches.length === 0 ? <EmptyState message="No favorites match your search." /> : <ul className="mt-1">{matches.map(s => <StationRow key={s.id} station={s} />)}</ul>
         )}
       </section>
 

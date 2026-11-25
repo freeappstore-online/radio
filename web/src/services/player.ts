@@ -11,6 +11,7 @@ export type PlayerState = {
   isPlaying: boolean
   isLoading: boolean
   error: PlayerError | null
+  volume: number
 }
 
 type Listener = (state: PlayerState) => void
@@ -27,7 +28,7 @@ class StationPlayer {
   private attempt = 0
   private reconnected = false
   private timer: ReturnType<typeof setTimeout> | undefined
-  state: PlayerState = { station: null, isPlaying: false, isLoading: false, error: null }
+  state: PlayerState = { station: null, isPlaying: false, isLoading: false, error: null, volume: 1 }
 
   constructor() {
     this.audio.addEventListener('playing', () => {
@@ -36,6 +37,7 @@ class StationPlayer {
       this.set({ isPlaying: true, isLoading: false, error: null })
       this.updateMediaSession()
     })
+    this.audio.addEventListener('volumechange', () => this.set({ volume: this.audio.volume }))
     this.audio.addEventListener('pause', () => this.set({ isPlaying: false }))
     this.audio.addEventListener('waiting', () => {
       if (!this.state.isPlaying) return
@@ -54,6 +56,10 @@ class StationPlayer {
       navigator.mediaSession.setActionHandler('stop', () => this.stop())
     }
   }
+
+  get element() { return this.audio }
+
+  setVolume(volume: number) { this.audio.volume = Math.max(0, Math.min(1, volume)) }
 
   subscribe(fn: Listener) {
     this.listeners.push(fn)

@@ -6,8 +6,9 @@
     "dev": "pnpm generate:icons && vite",
     "build": "pnpm generate:icons && vite build",
     "preview": "vite preview",
-    "test": "vitest run",
-    "generate:icons": "pwa-assets-generator --manifest=false"
+    "test": "vitest run src",
+    "generate:icons": "pwa-assets-generator --manifest=false",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@freeappstore/sdk": "^0.16.39",
@@ -16,6 +17,7 @@
     "react-dom": "^19"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.1",
     "@tailwindcss/vite": "^4.1",
     "@types/node": "^22.20.2",
     "@types/react": "^19",

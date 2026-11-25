@@ -34,6 +34,21 @@ export const CURATED: RadioStation[] = (list as CuratedEntry[]).map(s => ({
   source: s.source,
 }))
 
+/** Round-robin across networks so a short preview shows a mix rather than one network's channels. */
+export function interleaveBySource(stations: RadioStation[]): RadioStation[] {
+  const groups = new Map<string, RadioStation[]>()
+  for (const s of stations) {
+    const key = s.source ?? s.id
+    groups.set(key, [...(groups.get(key) ?? []), s])
+  }
+  const queues = [...groups.values()]
+  const out: RadioStation[] = []
+  for (let i = 0; out.length < stations.length; i++) {
+    for (const q of queues) if (q[i]) out.push(q[i])
+  }
+  return out
+}
+
 /** Hand-picked stations whose name, network or tags match the search and genre. */
 export function matchCurated(stations: RadioStation[], name: string, genre: string): RadioStation[] {
   const q = name.trim().toLowerCase()

@@ -137,3 +137,28 @@ body { padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-are
 img, video, canvas { max-width: 100%; }
 
 }
+
+/* Keep the SDK's profile destination visibly labelled beside the app navigation. */
+header a[aria-label="Profile"] {
+  width: auto;
+  min-width: 44px;
+  height: auto;
+  min-height: 44px;
+  flex-direction: column;
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+header a[aria-label="Profile"]::after { content: "Profile"; }
+
+/* Reserve room for the persistent mobile navigation and player. */
+#root { max-width: 100%; overflow-x: clip; padding-bottom: 8.5rem; }
+@media (min-width: 640px) { #root { padding-bottom: 4.5rem; } }
+@media (max-width: 639px) { header a[aria-label="Profile"] { display: none; } }
+
+/* Keep keyboard focus clear of the fixed mobile navigation and the player bar. */
+html { scroll-padding-bottom: 4.5rem; }
+html[data-player] { scroll-padding-bottom: 9.5rem; }
+@media (min-width: 640px) {
+  html { scroll-padding-bottom: 0; }
+  html[data-player] { scroll-padding-bottom: 5.5rem; }
+}

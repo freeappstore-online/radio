@@ -27,7 +27,7 @@ const CODEC_TYPES: Record<string, string> = {
 
 let probeAudio: HTMLAudioElement | undefined
 function canPlay(type: string): boolean {
-  probeAudio ??= new Audio()
+  probeAudio ??= document.createElement('audio')
   return probeAudio.canPlayType(type) !== ''
 }
 

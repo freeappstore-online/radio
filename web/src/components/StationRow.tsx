@@ -15,10 +15,6 @@ export function formatCount(n: number): string {
   return String(n)
 }
 
-function isAdFree(station: RadioStation, userTags: string[]): boolean {
-  return station.id.startsWith('soma-') || userTags.some(t => /ad.?free|no.?ads/i.test(t))
-}
-
 /** Move focus to the play button of the neighbouring row, since this row is about to disappear. */
 function focusNeighbour(li: HTMLLIElement | null) {
   const next = (li?.nextElementSibling ?? li?.previousElementSibling)?.querySelector<HTMLButtonElement>('button')
@@ -73,10 +69,10 @@ export function StationRow({ station }: { station: RadioStation }) {
             </span>
           </span>
           <span className="min-w-0 flex-1">
-            <span className={`flex items-center gap-1.5 truncate text-sm font-semibold ${current ? 'text-accent' : 'text-ink'}`}>
+            <span className={`flex items-center gap-1.5 truncate text-base font-semibold ${current ? 'text-accent' : 'text-ink'}`}>
               <span className="truncate">{station.name}</span>
-              {isAdFree(station, userTags) && (
-                <span className="flex-shrink-0 rounded bg-accent-soft px-1.5 py-0.5 text-[10px] font-bold text-accent-deep">AD-FREE</span>
+              {station.adFree === true && (
+                <span className="flex-shrink-0 rounded bg-accent-soft px-1.5 py-0.5 text-xs font-bold text-accent-deep">AD-FREE</span>
               )}
             </span>
             {meta && <span className="mt-0.5 block truncate text-xs text-muted">{meta}</span>}
@@ -110,8 +106,8 @@ export function StationRow({ station }: { station: RadioStation }) {
       </div>
 
       {expanded && (
-        <div className="mb-3 ml-14 space-y-3 rounded-xl border border-line bg-panel p-3 text-xs">
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-1">
+        <div className="mb-3 space-y-3 rounded-xl border border-line bg-panel p-3 text-xs">
+          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
             {station.country && <Detail label="Country" value={station.country} />}
             {station.state && <Detail label="State" value={station.state} />}
             {station.language && <Detail label="Language" value={station.language} />}
@@ -148,7 +144,7 @@ export function StationRow({ station }: { station: RadioStation }) {
                 value={newTag}
                 onChange={e => setNewTag(e.target.value)}
                 placeholder="Add tag, e.g. ad-free"
-                className="min-h-11 w-40 rounded-full border border-line bg-paper px-3 text-ink focus-visible:outline-2 focus-visible:outline-accent"
+                className="min-h-11 w-40 max-w-full rounded-full border border-line bg-paper px-3 text-ink focus-visible:outline-2 focus-visible:outline-accent"
               />
             </form>
           </div>

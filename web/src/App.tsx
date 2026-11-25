@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { initApp } from "@freeappstore/sdk";
-import { type NavItem, PageHeader, Shell } from "@freeappstore/sdk/ui";
+import { type NavItem, PageHeader, ProfilePage, Shell } from "@freeappstore/sdk/ui";
 import { BrowseScreen } from "./components/BrowseScreen";
 import { LibraryScreen } from "./components/LibraryScreen";
 import { PlayerBar } from "./components/PlayerBar";
-import { player } from "./services/player";
+import { Home, Library, Info, UserRound } from "lucide-react";
+import { AudioProvider, useAudioPlayer } from "./AudioContext";
 
 export const fas = initApp({ appId: "radio" });
 
@@ -15,6 +16,11 @@ const NAV: NavItem[] = [
 ];
 
 export default function App() {
+  return <AudioProvider><AppShell /><PlayerBar /></AudioProvider>;
+}
+
+function AppShell() {
+  const audio = useAudioPlayer();
   const [path, setPath] = useState(() => window.location.pathname);
 
   useEffect(() => {
@@ -29,22 +35,26 @@ export default function App() {
   };
 
   return (
-    <Shell app={fas} appName="Radio" nav={NAV} onNavigate={navigate}>
+    <Shell app={fas} appName="Radio" nav={NAV} onNavigate={navigate} profileHref="/profile" headerAppearance={false}
+      headerActions={audio.station ? <span className="hidden max-w-40 truncate text-sm text-muted lg:block">{audio.isPlaying ? "Playing" : "Paused"}: {audio.station.name}</span> : null}
+      renderNav={({ items, currentPath, onNavigate }) => {
+        const tabs = [...items, { label: "Profile", href: "/profile" }];
+        const icons = [Home, Library, Info, UserRound];
+        return <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-50 flex h-16 max-w-full items-stretch justify-around border-t border-line bg-panel pb-[env(safe-area-inset-bottom)] sm:static sm:h-auto sm:justify-start sm:gap-1 sm:border-0 sm:bg-transparent sm:pb-0">
+          {tabs.map((item, i) => { const Icon = icons[i]; return <a key={item.href} href={item.href} aria-current={currentPath.split("?")[0] === item.href ? "page" : undefined} onClick={e => { if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.button === 0) { e.preventDefault(); onNavigate(item.href); } }} className={`flex min-h-11 min-w-11 flex-1 flex-col items-center justify-center rounded px-1 text-xs text-ink focus-visible:outline-2 focus-visible:outline-accent sm:flex-none ${item.href === "/profile" ? "sm:hidden" : ""}`}><Icon aria-hidden size={19} /><span>{item.label}</span></a> })}
+        </nav>;
+      }}>
       <Screens path={path} />
     </Shell>
   );
 }
 
 function Screens({ path }: { path: string }) {
-  // Shell swaps these out for its Profile screen; pause so audio never plays without controls.
-  useEffect(() => () => player.pause(), []);
-
   return (
     <>
-      <div className="mx-auto w-full max-w-3xl flex-1 p-4 sm:p-8">
-        {path === "/about" ? <About /> : path === "/library" ? <LibraryScreen /> : <BrowseScreen />}
+      <div className="mx-auto w-full max-w-3xl min-w-0 flex-1 p-4 sm:p-8">
+        {path === "/profile" ? <ProfilePage app={fas} /> : path === "/about" ? <About /> : path === "/library" ? <LibraryScreen /> : <BrowseScreen />}
       </div>
-      <PlayerBar />
     </>
   );
 }

@@ -1,7 +1,6 @@
 import { useEffect } from 'react'
 import { Loader2, Pause, Play, Square } from 'lucide-react'
-import { player } from '../services/player'
-import { usePlayer } from '../hooks'
+import { useAudioPlayer } from '../AudioContext'
 import { Artwork } from './Artwork'
 
 const BUTTON = 'flex h-11 w-11 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent'
@@ -9,27 +8,28 @@ const BUTTON = 'flex h-11 w-11 items-center justify-center rounded-full focus-vi
 const INTERACTIVE = 'input, textarea, select, button, a[href], [contenteditable="true"], [role="button"]'
 
 export function PlayerBar() {
-  const ps = usePlayer()
+  const ps = useAudioPlayer()
   const hasStation = !!ps.station
+  const { toggle } = ps
 
   // Space toggles playback unless focus is on something that uses Space itself.
-  // Registered here so it goes away with the screens (e.g. on the Profile route).
   useEffect(() => {
+    if (!hasStation) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== ' ' || e.repeat || e.ctrlKey || e.metaKey || e.altKey || !player.state.station) return
+      if (e.key !== ' ' || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return
       if (e.target instanceof Element && e.target.closest(INTERACTIVE)) return
       e.preventDefault()
-      player.togglePlayPause()
+      toggle()
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [])
+  }, [hasStation, toggle])
 
-  // Keep focused rows clear of the sticky bar when tabbing or scrolling into view.
+  // Keep focused rows clear of the fixed bar when tabbing (scroll-padding in index.css keys off this).
   useEffect(() => {
     if (!hasStation) return
-    document.documentElement.style.scrollPaddingBottom = '5.5rem'
-    return () => { document.documentElement.style.scrollPaddingBottom = '' }
+    document.documentElement.dataset.player = ''
+    return () => { delete document.documentElement.dataset.player }
   }, [hasStation])
 
   if (!ps.station) return null
@@ -40,7 +40,7 @@ export function PlayerBar() {
     : ps.error ? 'Stream unavailable. Try another station.' : ps.isLoading ? 'Connecting…' : ps.isPlaying ? 'Live' : 'Paused'
 
   return (
-    <section aria-label="Now playing" className="sticky bottom-0 z-40 border-t border-line bg-panel-glass backdrop-blur">
+    <section aria-label="Now playing" className="fixed inset-x-0 bottom-16 z-40 sm:bottom-0 border-t border-line bg-panel-glass backdrop-blur">
       <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-2 sm:px-8">
         <Artwork src={ps.station.favicon} size={44} />
         <div className="min-w-0 flex-1">
@@ -61,11 +61,11 @@ export function PlayerBar() {
           type="button"
           className={`${BUTTON} bg-accent text-paper`}
           aria-label={active ? 'Pause' : 'Play'}
-          onClick={() => player.togglePlayPause()}
+          onClick={() => ps.toggle()}
         >
           {ps.isLoading ? <Loader2 aria-hidden className="h-5 w-5 animate-spin" /> : ps.isPlaying ? <Pause aria-hidden className="h-5 w-5" /> : <Play aria-hidden className="h-5 w-5" />}
         </button>
-        <button type="button" className={`${BUTTON} text-muted hover:text-ink`} aria-label="Stop" onClick={() => player.stop()}>
+        <button type="button" className={`${BUTTON} text-muted hover:text-ink`} aria-label="Stop" onClick={() => ps.stop()}>
           <Square aria-hidden className="h-4 w-4" />
         </button>
       </div>

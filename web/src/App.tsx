@@ -4,7 +4,8 @@ import { type NavItem, PageHeader, ProfilePage, Shell } from "@freeappstore/sdk/
 import { BrowseScreen } from "./components/BrowseScreen";
 import { LibraryScreen } from "./components/LibraryScreen";
 import { PlayerBar } from "./components/PlayerBar";
-import { Home, Library, Info } from "lucide-react";
+import { Home, Library, Info, UserRound } from "lucide-react";
+import { AudioProvider, useAudioPlayer } from "./AudioContext";
 
 export const fas = initApp({ appId: "radio" });
 
@@ -15,6 +16,11 @@ const NAV: NavItem[] = [
 ];
 
 export default function App() {
+  return <AudioProvider><AppShell /><PlayerBar /></AudioProvider>;
+}
+
+function AppShell() {
+  const audio = useAudioPlayer();
   const [path, setPath] = useState(() => window.location.pathname);
 
   useEffect(() => {
@@ -29,13 +35,16 @@ export default function App() {
   };
 
   return (
-    <Shell app={fas} appName="Radio" nav={NAV} onNavigate={navigate} profileHref="/profile" headerAppearance={false} renderNav={({ items, currentPath, onNavigate }) => (
-      <nav aria-label="Main" className="flex max-w-full items-center gap-1">
-        {items.map((item, i) => { const Icon = [Home, Library, Info][i]; return <a key={item.href} href={item.href} aria-current={currentPath === item.href ? "page" : undefined} onClick={e => { if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.button === 0) { e.preventDefault(); onNavigate(item.href); } }} className="flex min-h-11 min-w-11 flex-col items-center justify-center rounded px-1 text-xs text-ink focus-visible:outline-2 focus-visible:outline-accent"><Icon aria-hidden size={19} /><span>{item.label}</span></a> })}
-      </nav>
-    )}>
+    <Shell app={fas} appName="Radio" nav={NAV} onNavigate={navigate} profileHref="/profile" headerAppearance={false}
+      headerActions={audio.station ? <span className="hidden max-w-40 truncate text-sm text-muted lg:block">{audio.isPlaying ? "Playing" : "Paused"}: {audio.station.name}</span> : null}
+      renderNav={({ items, currentPath, onNavigate }) => {
+        const tabs = [...items, { label: "Profile", href: "/profile" }];
+        const icons = [Home, Library, Info, UserRound];
+        return <nav aria-label="Main" className="fixed inset-x-0 bottom-0 z-50 flex h-16 max-w-full items-stretch justify-around border-t border-line bg-panel pb-[env(safe-area-inset-bottom)] sm:static sm:h-auto sm:justify-start sm:gap-1 sm:border-0 sm:bg-transparent sm:pb-0">
+          {tabs.map((item, i) => { const Icon = icons[i]; return <a key={item.href} href={item.href} aria-current={currentPath.split("?")[0] === item.href ? "page" : undefined} onClick={e => { if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.button === 0) { e.preventDefault(); onNavigate(item.href); } }} className={`flex min-h-11 min-w-11 flex-1 flex-col items-center justify-center rounded px-1 text-xs text-ink focus-visible:outline-2 focus-visible:outline-accent sm:flex-none ${item.href === "/profile" ? "sm:hidden" : ""}`}><Icon aria-hidden size={19} /><span>{item.label}</span></a> })}
+        </nav>;
+      }}>
       <Screens path={path} />
-      <PlayerBar />
     </Shell>
   );
 }

@@ -149,3 +149,8 @@ header a[aria-label="Profile"] {
   line-height: 1rem;
 }
 header a[aria-label="Profile"]::after { content: "Profile"; }
+
+/* Reserve room for the persistent mobile navigation and player. */
+#root { max-width: 100%; overflow-x: clip; padding-bottom: 8.5rem; }
+@media (min-width: 640px) { #root { padding-bottom: 4.5rem; } }
+@media (max-width: 639px) { header a[aria-label="Profile"] { display: none; } }

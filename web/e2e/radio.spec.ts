@@ -42,19 +42,17 @@ for (const width of [320, 375, 390, 1280]) {
 }
 
 
-test('saved favorites and verified ad-free filters combine and update', async ({ page }) => {
+test('verified ad-free filter and favorites search in Library', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('radio-favorites', JSON.stringify([
     { id: 'soma-fixture', name: 'Fixture Station', streamUrl: 'https://ice2.somafm.com/fixture-128-mp3', tags: 'jazz', country: 'The United States Of America', bitrate: 128 },
     { id: 'radio-unknown', name: 'Unknown Station', streamUrl: 'https://example.com/stream', tags: 'ad-free,jazz' },
   ])))
   await page.goto('/')
-  await page.getByRole('button', { name: 'Favorites', exact: true }).click()
-  await expect(page.getByRole('button', { name: 'Play Unknown Station' })).toBeVisible()
+  await page.getByRole('button', { name: 'Filters' }).click()
   await page.getByRole('button', { name: 'Ad-free', exact: true }).click()
-  await expect(page.getByRole('button', { name: 'Play Fixture Station' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Filters (1)' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Play Fixture Station' }).first()).toBeVisible()
   await expect(page.getByRole('button', { name: 'Play Unknown Station' })).toHaveCount(0)
-  await page.getByRole('button', { name: 'Favorite Fixture Station' }).click()
-  await expect(page.getByText('No stations match your filters.')).toBeVisible()
   await page.getByRole('link', { name: 'Library' }).click()
   await page.getByLabel('Search favorites').pressSequentially('unknown')
   await expect(page.getByRole('button', { name: 'Play Unknown Station' })).toBeVisible()

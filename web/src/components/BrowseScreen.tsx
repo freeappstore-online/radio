@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { PageHeader, Spinner } from '@freeappstore/sdk/ui'
+import { Spinner } from '@freeappstore/sdk/ui'
 import { PAGE_SIZE, searchStations, type RadioFilters, type RadioOrder } from '../services/radio'
 import { filterPlayable, isReachable, knownUnplayable } from '../services/availability'
 import { getSomaFMChannels } from '../services/somafm'
 import { CURATED, interleaveBySource, matchCurated } from '../services/curated'
 import type { RadioStation } from '../types'
 import { StationRow } from './StationRow'
-import { getFavorites, isBlocked, useLibraryVersion } from '../services/library'
+import { isBlocked, useLibraryVersion } from '../services/library'
 
 const GENRES = [
   ['pop', '🎤'], ['rock', '🎸'], ['news', '📰'], ['classical', '🎼'], ['dance', '💃'], ['talk', '🎙️'],
@@ -60,7 +60,6 @@ export function BrowseScreen() {
   const [country, setCountry] = useState(() => initialParam('country'))
   const [language, setLanguage] = useState(() => initialParam('lang'))
   const [quality, setQuality] = useState(() => initialParam('quality'))
-  const [favoritesOnly, setFavoritesOnly] = useState(() => initialParam('fav') === '1')
   const [adFreeOnly, setAdFreeOnly] = useState(() => initialParam('adfree') === '1')
   const [order, setOrder] = useState<RadioOrder>(() => (ORDERS.find(o => o.value === initialParam('sort'))?.value ?? 'clickcount'))
   useLibraryVersion()
@@ -74,13 +73,12 @@ export function BrowseScreen() {
     if (language) params.set('lang', language)
     if (quality) params.set('quality', quality)
     if (order !== 'clickcount') params.set('sort', order)
-    if (favoritesOnly) params.set('fav', '1')
     if (adFreeOnly) params.set('adfree', '1')
     const query = params.toString()
     if (window.location.pathname === '/' && window.location.search !== (query ? `?${query}` : '')) {
       window.history.replaceState(window.history.state, '', query ? `/?${query}` : '/')
     }
-  }, [name, genre, country, language, quality, order, favoritesOnly, adFreeOnly])
+  }, [name, genre, country, language, quality, order, adFreeOnly])
   const [stations, setStations] = useState<RadioStation[]>([])
   const [nextOffset, setNextOffset] = useState(0)
   const [hasMore, setHasMore] = useState(false)
@@ -93,9 +91,12 @@ export function BrowseScreen() {
   const [somaLoading, setSomaLoading] = useState(true)
   const [showAllPicks, setShowAllPicks] = useState(false)
 
-  const filtered = !!(name.trim() || genre || country || language || quality || favoritesOnly || adFreeOnly)
-  // Favorites and Ad-free are answered locally: saved favorites, and SomaFM (the only source verified ad-free).
-  const localOnly = favoritesOnly || adFreeOnly
+  const filtered = !!(name.trim() || genre || country || language || quality || adFreeOnly)
+  // Ad-free is answered locally from SomaFM, the only source verified ad-free.
+  const localOnly = adFreeOnly
+  // Filters kept behind the Filters button; the panel starts open if one of them is already set.
+  const hiddenActive = [order !== 'clickcount', quality, country, language, adFreeOnly].filter(Boolean).length
+  const [showFilters, setShowFilters] = useState(hiddenActive > 0)
 
   // Hand-picked stations: the curated list plus SomaFM's channels, minus any this browser can't play.
   useEffect(() => {
@@ -159,11 +160,8 @@ export function BrowseScreen() {
     (!country || s.country?.toLowerCase() === country.toLowerCase()) &&
     (!language || (s.language ?? '').toLowerCase().includes(language.toLowerCase())) &&
     (!quality || (s.bitrate ?? 0) >= Number(quality))
-  const localSource = favoritesOnly
-    ? getFavorites().map(f => soma.find(x => x.id === f.id) ?? f).filter(s => !adFreeOnly || s.adFree === true)
-    : soma.filter(s => s.adFree === true)
-  const visible = (localOnly ? localSource.filter(matches) : stations).filter(s => !isBlocked(s.id))
-  const busy = localOnly ? adFreeOnly && somaLoading : loading
+  const visible = (localOnly ? soma.filter(s => s.adFree === true && matches(s)) : stations).filter(s => !isBlocked(s.id))
+  const busy = localOnly ? somaLoading : loading
 
   const loadMore = () => {
     const gen = generation.current
@@ -175,47 +173,56 @@ export function BrowseScreen() {
 
   const clearAll = () => {
     setName(''); setGenre(''); setCountry(''); setLanguage(''); setQuality(''); setOrder('clickcount')
-    setFavoritesOnly(false); setAdFreeOnly(false)
+    setAdFreeOnly(false)
     document.getElementById('station-search')?.focus() // the button that was clicked disappears
   }
 
   return (
     <>
-      <PageHeader title="Radio" description="30,000+ live stations · 237 countries · 620 languages" />
+      <h1 className="sr-only">Radio</h1>
 
-      <div className="mt-4">
-        <label htmlFor="station-search" className="mb-1 block text-xs font-semibold uppercase tracking-wider text-muted">Station name</label>
+      <div className="flex gap-2">
+        <label htmlFor="station-search" className="sr-only">Station name</label>
         <input
           id="station-search"
           type="search"
           value={name}
           onChange={e => setName(e.target.value)}
-          placeholder="e.g. BBC, jazz, lofi"
-          className="min-h-11 w-full rounded-full border border-line bg-panel px-4 text-sm text-ink focus-visible:outline-2 focus-visible:outline-accent"
+          placeholder="Search stations, e.g. BBC, lofi"
+          className="min-h-11 min-w-0 flex-1 rounded-full border border-line bg-panel px-4 text-sm text-ink focus-visible:outline-2 focus-visible:outline-accent"
         />
+        <button
+          type="button"
+          aria-expanded={showFilters}
+          aria-controls="more-filters"
+          onClick={() => setShowFilters(v => !v)}
+          className={`min-h-11 shrink-0 rounded-full px-4 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-accent ${hiddenActive ? 'bg-accent text-paper' : 'border border-line bg-panel text-ink'}`}
+        >
+          Filters{hiddenActive ? ` (${hiddenActive})` : ''}
+        </button>
       </div>
 
-      <div className="mt-4 space-y-3">
-        <div role="group" aria-label="Station filters" className="flex flex-wrap gap-2">
-          <button type="button" aria-pressed={favoritesOnly} onClick={() => setFavoritesOnly(v => !v)} className={`min-h-11 rounded-lg px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent ${favoritesOnly ? 'bg-accent font-semibold text-paper' : 'bg-paper-deep text-ink'}`}>Favorites</button>
+      <ChipGroup label="Genre" options={GENRES} value={genre} onChange={setGenre} scroll />
+
+      {showFilters && (
+        <div id="more-filters" className="mt-2 space-y-3 rounded-xl border border-line p-3">
           <button type="button" aria-pressed={adFreeOnly} onClick={() => setAdFreeOnly(v => !v)} className={`min-h-11 rounded-lg px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent ${adFreeOnly ? 'bg-accent font-semibold text-paper' : 'bg-paper-deep text-ink'}`}>Ad-free</button>
+          <ChipGroup label="Sort by" options={ORDERS} value={order} onChange={v => setOrder((v || 'clickcount') as RadioOrder)} required />
+          <ChipGroup label="Quality" options={QUALITIES} value={quality} onChange={setQuality} />
+          <ChipGroup label="Country" options={COUNTRIES} value={country} onChange={setCountry} />
+          <ChipGroup label="Language" options={LANGUAGES} value={language} onChange={setLanguage} />
         </div>
-        <ChipGroup label="Sort by" options={ORDERS} value={order} onChange={v => setOrder((v || 'clickcount') as RadioOrder)} required />
-        <ChipGroup label="Quality" options={QUALITIES} value={quality} onChange={setQuality} />
-        <ChipGroup label="Genre" options={GENRES} value={genre} onChange={setGenre} />
-        <ChipGroup label="Country" options={COUNTRIES} value={country} onChange={setCountry} />
-        <ChipGroup label="Language" options={LANGUAGES} value={language} onChange={setLanguage} />
-        {filtered && (
-          <button type="button" onClick={clearAll} className="min-h-11 rounded-lg px-2 text-sm text-accent underline focus-visible:outline-2 focus-visible:outline-accent">
-            Clear all filters
-          </button>
-        )}
-      </div>
+      )}
+
+      {filtered && (
+        <button type="button" onClick={clearAll} className="min-h-11 rounded-lg px-2 text-sm text-accent underline focus-visible:outline-2 focus-visible:outline-accent">
+          Clear all filters
+        </button>
+      )}
 
       {pickMatches.length > 0 && (
-        <section className="mt-6" aria-labelledby="picks-heading">
+        <section className="mt-4" aria-labelledby="picks-heading">
           <h2 id="picks-heading" tabIndex={-1} className="text-lg font-bold text-ink">{filtered ? 'Hand-picked matches' : 'Hand-picked'}</h2>
-          {!filtered && <p className="mt-1 text-xs text-muted">Public, listener-supported and independent radio with reliable streams.</p>}
           <ul className="mt-1">
             {(showAllPicks ? pickMatches : pickMatches.slice(0, PICKS_PREVIEW)).map(s => <StationRow key={s.id} station={s} />)}
           </ul>
@@ -266,17 +273,19 @@ export function BrowseScreen() {
   )
 }
 
-function ChipGroup({ label, options, value, onChange, required }: {
+function ChipGroup({ label, options, value, onChange, required, scroll }: {
   label: string
   options: { value: string; label: string }[]
   value: string
   onChange: (value: string) => void
   required?: boolean
+  /** One horizontally scrolling row with no visible label, to keep it compact. */
+  scroll?: boolean
 }) {
   return (
-    <div role="group" aria-label={label}>
-      <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted">{label}</div>
-      <div className="flex flex-wrap gap-2 pb-1">
+    <div role="group" aria-label={label} className={scroll ? 'mt-3' : undefined}>
+      {!scroll && <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted">{label}</div>}
+      <div className={`flex gap-2 pb-1 ${scroll ? '-mx-1 overflow-x-auto px-1 [scrollbar-width:none]' : 'flex-wrap'}`}>
         {options.map(o => {
           const active = value === o.value
           return (
@@ -285,7 +294,7 @@ function ChipGroup({ label, options, value, onChange, required }: {
               type="button"
               aria-pressed={active}
               onClick={() => onChange(active && !required ? '' : o.value)}
-              className={`min-h-11 rounded-lg px-2.5 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent ${
+              className={`min-h-11 shrink-0 rounded-lg px-2.5 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent ${
                 active ? 'bg-accent font-semibold text-paper' : 'bg-paper-deep text-muted hover:text-ink'
               }`}
             >

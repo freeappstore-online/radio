@@ -156,9 +156,11 @@ header a[aria-label="Profile"]::after { content: "Profile"; }
 @media (max-width: 639px) { header a[aria-label="Profile"] { display: none; } }
 
 /* Keep keyboard focus clear of the fixed mobile navigation and the player bar. */
-html { scroll-padding-bottom: 4.5rem; }
-html[data-player] { scroll-padding-bottom: 9.5rem; }
-@media (min-width: 640px) {
-  html { scroll-padding-bottom: 0; }
-  html[data-player] { scroll-padding-bottom: 5.5rem; }
+@layer base {
+  html { scroll-padding-bottom: 4.5rem; }
+  html[data-player] { scroll-padding-bottom: 9.5rem; }
+  @media (min-width: 640px) {
+    html { scroll-padding-bottom: 0; }
+    html[data-player] { scroll-padding-bottom: 5.5rem; }
+  }
 }

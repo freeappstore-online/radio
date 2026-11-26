@@ -15,6 +15,12 @@ export function formatCount(n: number): string {
   return String(n)
 }
 
+/** Regional-indicator emoji for an ISO 3166-1 alpha-2 code, e.g. "FR" → 🇫🇷. */
+function flag(code?: string): string {
+  if (!code || !/^[a-z]{2}$/i.test(code)) return ''
+  return String.fromCodePoint(...[...code.toUpperCase()].map(c => 0x1f1a5 + c.charCodeAt(0)))
+}
+
 /** Move focus to the play button of the neighbouring row, since this row is about to disappear. */
 function focusNeighbour(li: HTMLLIElement | null) {
   const next = (li?.nextElementSibling ?? li?.previousElementSibling)?.querySelector<HTMLButtonElement>('button')
@@ -37,9 +43,9 @@ export function StationRow({ station }: { station: RadioStation }) {
   const current = ps.station?.id === station.id
   const active = current && (ps.isPlaying || ps.isLoading)
   const tags = station.tags?.split(',').map(t => t.trim()).filter(t => t.length > 0 && t.length < 25) ?? []
+  const countryFlag = flag(station.countryCode)
   const meta = [
     station.source,
-    station.country,
     station.bitrate ? `${station.bitrate} kbps ${station.codec ?? ''}`.trim() : '',
     station.votes ? `${formatCount(station.votes)} votes` : '',
   ].filter(Boolean).join(' · ')
@@ -75,24 +81,24 @@ export function StationRow({ station }: { station: RadioStation }) {
                 <span className="flex-shrink-0 rounded bg-accent-soft px-1.5 py-0.5 text-xs font-bold text-accent-deep">AD-FREE</span>
               )}
             </span>
-            {meta && <span className="mt-0.5 block truncate text-xs text-muted">{meta}</span>}
+            {(meta || station.country) && (
+              <span className="mt-0.5 block truncate text-xs text-muted">
+                {/* Phones show just the flag (named for screen readers); wider screens show flag and name. */}
+                {countryFlag ? (
+                  <>
+                    <span title={station.country}>{countryFlag}</span>
+                    {station.country && <span className="sr-only sm:not-sr-only"> {station.country}</span>}
+                  </>
+                ) : station.country}
+                {(countryFlag || station.country) && meta ? ' · ' : ''}
+                {meta}
+              </span>
+            )}
           </span>
         </button>
 
         <button type="button" className={ICON_BUTTON} aria-expanded={expanded} aria-label={`Details for ${station.name}`} onClick={() => setExpanded(!expanded)}>
           <Info aria-hidden className="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          className={ICON_BUTTON}
-          aria-label={`Block ${station.name}`}
-          onClick={() => {
-            if (current) player.stop()
-            focusNeighbour(rowRef.current)
-            block(station)
-          }}
-        >
-          <Ban aria-hidden className="h-4 w-4" />
         </button>
         <button
           type="button"
@@ -149,11 +155,25 @@ export function StationRow({ station }: { station: RadioStation }) {
             </form>
           </div>
 
-          {station.homepage && (
-            <a href={station.homepage} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-accent underline focus-visible:outline-2 focus-visible:outline-accent">
-              Station website
-            </a>
-          )}
+          <div className="flex flex-wrap items-center gap-x-4">
+            {station.homepage && (
+              <a href={station.homepage} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-accent underline focus-visible:outline-2 focus-visible:outline-accent">
+                Station website
+              </a>
+            )}
+            <button
+              type="button"
+              aria-label={`Block ${station.name}`}
+              onClick={() => {
+                if (current) player.stop()
+                focusNeighbour(rowRef.current)
+                block(station)
+              }}
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-lg text-muted hover:text-danger focus-visible:outline-2 focus-visible:outline-accent"
+            >
+              <Ban aria-hidden className="h-4 w-4" /> Block station
+            </button>
+          </div>
         </div>
       )}
     </li>

@@ -12,6 +12,7 @@ type CuratedEntry = {
   favicon?: string
   genre?: string
   country?: string
+  countryCode?: string
   language?: string
   codec?: string
   bitrate?: number
@@ -27,6 +28,7 @@ export const CURATED: RadioStation[] = (list as CuratedEntry[]).map(s => ({
   genre: s.genre,
   tags: s.genre,
   country: s.country,
+  countryCode: s.countryCode,
   language: s.language,
   codec: s.codec === 'HLS' ? undefined : s.codec,
   hls: s.codec === 'HLS' || undefined,

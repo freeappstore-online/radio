@@ -7,6 +7,8 @@ export interface RadioStation {
   altStreamUrl?: string
   genre?: string
   country?: string
+  /** ISO 3166-1 alpha-2 code, used for the flag. */
+  countryCode?: string
   language?: string
   bitrate?: number
   codec?: string

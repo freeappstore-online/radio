@@ -35,6 +35,7 @@ export async function getSomaFMChannels(): Promise<RadioStation[]> {
         streamUrl: directStream,
         genre: channel.genre,
         country: 'The United States Of America',
+        countryCode: 'US',
         favicon: channel.xlimage || channel.largeimage || channel.image,
         votes: channel.listeners || 0,
         tags: channel.genre,

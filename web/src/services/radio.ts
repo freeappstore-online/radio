@@ -9,6 +9,7 @@ interface RawRadioStation {
   url: string
   tags?: string
   country?: string
+  countrycode?: string
   language?: string
   bitrate?: number
   codec?: string
@@ -90,6 +91,7 @@ function mapStation(station: RawRadioStation): RadioStation {
     altStreamUrl: station.url_resolved && station.url !== station.url_resolved ? station.url : undefined,
     genre: station.tags,
     country: station.country,
+    countryCode: station.countrycode || undefined,
     language: station.language,
     bitrate: station.bitrate || undefined,
     codec: station.codec || undefined,

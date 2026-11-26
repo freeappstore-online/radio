@@ -19,25 +19,20 @@ export async function getSomaFMChannels(): Promise<RadioStation[]> {
     const res = await fetch('https://somafm.com/channels.json')
     const data = await res.json() as SomaResponse
     return (data.channels ?? []).map((channel) => {
-      // Extract direct stream URL from PLS playlist URL
-      // PLS URL pattern: https://api.somafm.com/bootliquor320.pls
-      // Direct stream: https://ice6.somafm.com/bootliquor-320-mp3
-      // Simpler: somafm provides direct MP3 URLs via their CDN
       const id = channel.id
-      const directStream = `https://ice2.somafm.com/${id}-128-mp3`
-
       return {
         // SomaFM describes its channels as commercial-free: https://somafm.com/support/
         adFree: true,
         id: `soma-${id}`,
         source: 'SomaFM',
         name: channel.title,
-        streamUrl: directStream,
+        // SomaFM's direct 128k MP3 stream (its .pls playlists point at the same servers).
+        streamUrl: `https://ice2.somafm.com/${id}-128-mp3`,
         genre: channel.genre,
         country: 'The United States Of America',
         countryCode: 'US',
         favicon: channel.xlimage || channel.largeimage || channel.image,
-        votes: channel.listeners || 0,
+        clickcount: channel.listeners || 0,
         tags: channel.genre,
         codec: 'MP3',
         bitrate: 128,

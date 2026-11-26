@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Loader2, Pause, Play, Square } from 'lucide-react'
-import { useAudioPlayer } from '../AudioContext'
+import { player } from '../services/player'
+import { usePlayer } from '../hooks'
 import { Artwork } from './Artwork'
 
 const BUTTON = 'flex h-11 w-11 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent'
@@ -8,9 +9,8 @@ const BUTTON = 'flex h-11 w-11 items-center justify-center rounded-full focus-vi
 const INTERACTIVE = 'input, textarea, select, button, a[href], [contenteditable="true"], [role="button"]'
 
 export function PlayerBar() {
-  const ps = useAudioPlayer()
+  const ps = usePlayer()
   const hasStation = !!ps.station
-  const { toggle } = ps
 
   // Space toggles playback unless focus is on something that uses Space itself.
   useEffect(() => {
@@ -19,11 +19,11 @@ export function PlayerBar() {
       if (e.key !== ' ' || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return
       if (e.target instanceof Element && e.target.closest(INTERACTIVE)) return
       e.preventDefault()
-      toggle()
+      player.togglePlayPause()
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [hasStation, toggle])
+  }, [hasStation])
 
   // Keep focused rows clear of the fixed bar when tabbing (scroll-padding in index.css keys off this).
   useEffect(() => {
@@ -61,11 +61,11 @@ export function PlayerBar() {
           type="button"
           className={`${BUTTON} bg-accent text-paper`}
           aria-label={active ? 'Pause' : 'Play'}
-          onClick={() => ps.toggle()}
+          onClick={() => player.togglePlayPause()}
         >
           {ps.isLoading ? <Loader2 aria-hidden className="h-5 w-5 animate-spin" /> : ps.isPlaying ? <Pause aria-hidden className="h-5 w-5" /> : <Play aria-hidden className="h-5 w-5" />}
         </button>
-        <button type="button" className={`${BUTTON} text-muted hover:text-ink`} aria-label="Stop" onClick={() => ps.stop()}>
+        <button type="button" className={`${BUTTON} text-muted hover:text-ink`} aria-label="Stop" onClick={() => player.stop()}>
           <Square aria-hidden className="h-4 w-4" />
         </button>
       </div>

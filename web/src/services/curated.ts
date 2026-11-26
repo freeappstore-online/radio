@@ -58,7 +58,7 @@ export function matchCurated(stations: RadioStation[], name: string, genre: stri
   return stations.filter(s => {
     const tags = (s.tags ?? '').toLowerCase()
     const matchesName = !q || s.name.toLowerCase().includes(q) || (s.source ?? '').toLowerCase().includes(q) || tags.includes(q)
-    const matchesGenre = !g || tags.split(',').some(t => t.trim() === g || t.trim().includes(g))
+    const matchesGenre = !g || tags.split(',').some(t => t.trim().includes(g))
     return matchesName && matchesGenre
   })
 }

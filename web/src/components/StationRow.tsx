@@ -9,7 +9,7 @@ import { Artwork } from './Artwork'
 
 const ICON_BUTTON = 'flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full text-muted hover:bg-paper-deep hover:text-ink focus-visible:outline-2 focus-visible:outline-accent'
 
-export function formatCount(n: number): string {
+function formatCount(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
   return String(n)
@@ -149,7 +149,7 @@ export function StationRow({ station }: { station: RadioStation }) {
                 id={`tag-${station.id}`}
                 value={newTag}
                 onChange={e => setNewTag(e.target.value)}
-                placeholder="Add tag, e.g. ad-free"
+                placeholder="Add your own tag"
                 className="min-h-11 w-40 max-w-full rounded-full border border-line bg-paper px-3 text-ink focus-visible:outline-2 focus-visible:outline-accent"
               />
             </form>

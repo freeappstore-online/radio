@@ -5,7 +5,7 @@ import { BrowseScreen } from "./components/BrowseScreen";
 import { LibraryScreen } from "./components/LibraryScreen";
 import { PlayerBar } from "./components/PlayerBar";
 import { Home, Library, UserRound } from "lucide-react";
-import { AudioProvider, useAudioPlayer } from "./AudioContext";
+import { usePlayer } from "./hooks";
 
 export const fas = initApp({ appId: "radio" });
 
@@ -15,11 +15,11 @@ const NAV: NavItem[] = [
 ];
 
 export default function App() {
-  return <AudioProvider><AppShell /><PlayerBar /></AudioProvider>;
+  return <><AppShell /><PlayerBar /></>;
 }
 
 function AppShell() {
-  const audio = useAudioPlayer();
+  const audio = usePlayer();
   const [path, setPath] = useState(() => window.location.pathname);
 
   useEffect(() => {

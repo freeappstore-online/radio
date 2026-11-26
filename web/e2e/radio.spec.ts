@@ -57,3 +57,26 @@ test('verified ad-free filter and favorites search in Library', async ({ page })
   await page.getByLabel('Search favorites').pressSequentially('unknown')
   await expect(page.getByRole('button', { name: 'Play Unknown Station' })).toBeVisible()
 })
+
+test('a stream that drops twice reconnects both times', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Play Fixture Station' }).first().click()
+  const bar = page.getByRole('region', { name: 'Now playing' })
+  for (let drop = 0; drop < 2; drop++) {
+    await expect(bar.getByText('Live')).toBeVisible()
+    await page.evaluate(() => (window as any).fixtureAudio.dispatchEvent(new Event('ended')))
+  }
+  await expect(bar.getByText('Live')).toBeVisible()
+})
+
+test('a failed "load more" keeps the stations already shown', async ({ page }) => {
+  const station = (i: number) => ({ stationuuid: `s${i}`, name: `Directory Station ${i}`, url: `https://example.com/${i}`, url_resolved: '', codec: 'MP3', tags: '', votes: 0, clickcount: 0 })
+  await page.route('https://de1.api.radio-browser.info/json/stations/search?*', route =>
+    new URL(route.request().url()).searchParams.get('offset') === '0'
+      ? route.fulfill({ json: Array.from({ length: 60 }, (_, i) => station(i)) })
+      : route.fulfill({ status: 500 }))
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Load more stations' }).click()
+  await expect(page.getByRole('button', { name: "Couldn't load more. Try again" })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Play Directory Station 0' })).toBeVisible()
+})

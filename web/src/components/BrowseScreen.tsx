@@ -83,6 +83,7 @@ export function BrowseScreen() {
   const [nextOffset, setNextOffset] = useState(0)
   const [hasMore, setHasMore] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
+  const [moreFailed, setMoreFailed] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
   const [retry, setRetry] = useState(0)
@@ -147,6 +148,7 @@ export function BrowseScreen() {
       setError(false)
       setStations([])
       setHasMore(false)
+      setMoreFailed(false)
       loadPage(0, gen)
         .catch(() => { if (gen === generation.current) setError(true) })
         .finally(() => { if (gen === generation.current) setLoading(false) })
@@ -166,8 +168,9 @@ export function BrowseScreen() {
   const loadMore = () => {
     const gen = generation.current
     setLoadingMore(true)
+    setMoreFailed(false)
     loadPage(nextOffset, gen)
-      .catch(() => { if (gen === generation.current) setError(true) })
+      .catch(() => { if (gen === generation.current) setMoreFailed(true) })
       .finally(() => { if (gen === generation.current) setLoadingMore(false) })
   }
 
@@ -262,7 +265,7 @@ export function BrowseScreen() {
                   disabled={loadingMore}
                   className="min-h-11 rounded-full border border-line bg-panel px-5 text-sm font-semibold text-ink hover:bg-paper-deep focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-60"
                 >
-                  {loadingMore ? 'Loading…' : 'Load more stations'}
+                  {loadingMore ? 'Loading…' : moreFailed ? "Couldn't load more. Try again" : 'Load more stations'}
                 </button>
               </div>
             )}

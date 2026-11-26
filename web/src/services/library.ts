@@ -38,14 +38,13 @@ export function isFavorite(id: string): boolean {
   return getFavorites().some(s => s.id === id)
 }
 
-export function toggleFavorite(station: RadioStation): boolean {
+export function toggleFavorite(station: RadioStation): void {
   unblock(station.id)
   const favs = getFavorites()
   const idx = favs.findIndex(s => s.id === station.id)
   if (idx >= 0) favs.splice(idx, 1)
   else favs.unshift(station)
   write(FAVORITES_KEY, favs)
-  return idx < 0
 }
 
 // ===== Blocked =====
@@ -84,7 +83,5 @@ export function addToHistory(station: RadioStation) {
 }
 
 export function clearHistory() {
-  localStorage.removeItem(HISTORY_KEY)
-  version += 1
-  listeners.forEach(fn => fn())
+  write(HISTORY_KEY, [])
 }
